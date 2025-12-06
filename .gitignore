@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/app/generated/prisma
+
+# Python
+scripts/venv/
+__pycache__/
+*.pyc
+
+# PDFs (large binary files)
+scripts/PDF/

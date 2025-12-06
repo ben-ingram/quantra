@@ -1,26 +1,413 @@
 @import "tailwindcss";
 
+/* =============================================================================
+   QUANTRA DESIGN SYSTEM - Construction-Tech Industrial
+   Dark mode by default | Slate greys | Safety orange & Electric blue accents
+   ============================================================================= */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base Colors - Dark Industrial Palette */
+  --background: #0a0d12;
+  --background-secondary: #0f1419;
+  --background-tertiary: #151c25;
+
+  /* Surface Colors - For cards, panels, modals */
+  --surface: #1a2332;
+  --surface-hover: #1f2937;
+  --surface-active: #243044;
+  --surface-elevated: #232f42;
+
+  /* Border Colors */
+  --border: #2a3a50;
+  --border-subtle: #1e2a3d;
+  --border-strong: #3d5070;
+
+  /* Text Colors */
+  --foreground: #f1f5f9;
+  --foreground-secondary: #94a3b8;
+  --foreground-muted: #64748b;
+  --foreground-inverse: #0a0d12;
+
+  /* Primary - Electric Blue (Trust, Technology) */
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-active: #1d4ed8;
+  --primary-subtle: #1e3a5f;
+  --primary-foreground: #ffffff;
+
+  /* Accent - Safety Orange (Alerts, CTAs) */
+  --accent: #f97316;
+  --accent-hover: #ea580c;
+  --accent-active: #c2410c;
+  --accent-subtle: #431407;
+  --accent-foreground: #ffffff;
+
+  /* Status Colors - High Contrast for Data Viz */
+  --success: #10b981;
+  --success-subtle: #064e3b;
+  --success-foreground: #ffffff;
+
+  --warning: #f59e0b;
+  --warning-subtle: #451a03;
+  --warning-foreground: #0a0d12;
+
+  --danger: #ef4444;
+  --danger-subtle: #450a0a;
+  --danger-foreground: #ffffff;
+
+  --info: #06b6d4;
+  --info-subtle: #083344;
+  --info-foreground: #ffffff;
+
+  /* Severity Colors - Issue Prioritization */
+  --severity-critical: #dc2626;
+  --severity-high: #f97316;
+  --severity-medium: #eab308;
+  --severity-low: #22c55e;
+
+  /* Glass Morphism */
+  --glass-background: rgba(26, 35, 50, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --glass-blur: 12px;
+
+  /* Chart Colors - Data Visualization Palette */
+  --chart-1: #3b82f6;
+  --chart-2: #06b6d4;
+  --chart-3: #10b981;
+  --chart-4: #f59e0b;
+  --chart-5: #f97316;
+  --chart-6: #ef4444;
+  --chart-7: #8b5cf6;
+  --chart-8: #ec4899;
+
+  /* Spacing & Sizing */
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 72px;
+  --header-height: 64px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
 }
 
+/* Theme inline for Tailwind v4 compatibility */
 @theme inline {
   --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-background-tertiary: var(--background-tertiary);
+
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-surface-elevated: var(--surface-elevated);
+
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
   --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-foreground-muted: var(--foreground-muted);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-subtle: var(--primary-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-subtle: var(--accent-subtle);
+
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+
+  --color-severity-critical: var(--severity-critical);
+  --color-severity-high: var(--severity-high);
+  --color-severity-medium: var(--severity-medium);
+  --color-severity-low: var(--severity-low);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* =============================================================================
+   BASE STYLES
+   ============================================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =============================================================================
+   SCROLLBAR STYLES - Industrial Dark Theme
+   ============================================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-muted);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) var(--background-secondary);
+}
+
+/* =============================================================================
+   FOCUS STYLES - Accessibility
+   ============================================================================= */
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* =============================================================================
+   SELECTION STYLES
+   ============================================================================= */
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* =============================================================================
+   UTILITY CLASSES
+   ============================================================================= */
+
+/* Glass morphism utility */
+.glass {
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Gradient backgrounds */
+.gradient-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--info) 100%);
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--warning) 100%);
+}
+
+.gradient-danger {
+  background: linear-gradient(135deg, var(--danger) 0%, var(--accent) 100%);
+}
+
+/* Subtle background pattern for depth */
+.pattern-grid {
+  background-image:
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Glow effects for emphasis */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+}
+
+.glow-danger {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+/* Status indicator pulse animation */
+@keyframes pulse-status {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-status {
+  animation: pulse-status 2s ease-in-out infinite;
+}
+
+/* Skeleton loading animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 25%,
+    var(--surface-hover) 50%,
+    var(--surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* =============================================================================
+   TYPOGRAPHY UTILITIES
+   ============================================================================= */
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--foreground) 0%, var(--foreground-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Monospace for data/codes */
+.font-data {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-feature-settings: "tnum" on, "lnum" on;
+}
+
+/* =============================================================================
+   COMPONENT BASE STYLES
+   ============================================================================= */
+
+/* Card base */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+/* Button base reset */
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+
+/* Input base */
+input, textarea, select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--foreground);
+  padding: 0.5rem 0.75rem;
+  transition: all var(--transition-fast);
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-subtle);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--foreground-muted);
+}
+
+/* =============================================================================
+   DATA VISUALIZATION HELPERS
+   ============================================================================= */
+
+/* Severity badges */
+.badge-critical {
+  background: var(--danger-subtle);
+  color: var(--severity-critical);
+  border: 1px solid var(--severity-critical);
+}
+
+.badge-high {
+  background: var(--accent-subtle);
+  color: var(--severity-high);
+  border: 1px solid var(--severity-high);
+}
+
+.badge-medium {
+  background: var(--warning-subtle);
+  color: var(--severity-medium);
+  border: 1px solid var(--severity-medium);
+}
+
+.badge-low {
+  background: var(--success-subtle);
+  color: var(--severity-low);
+  border: 1px solid var(--severity-low);
+}
+
+/* Status dots */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+.status-dot-success {
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+.status-dot-warning {
+  background: var(--warning);
+  box-shadow: 0 0 8px var(--warning);
+}
+
+.status-dot-danger {
+  background: var(--danger);
+  box-shadow: 0 0 8px var(--danger);
+}
+
+.status-dot-info {
+  background: var(--info);
+  box-shadow: 0 0 8px var(--info);
 }

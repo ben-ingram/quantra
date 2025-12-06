@@ -1,0 +1,496 @@
+// Quantra - Construction QA Intelligence Platform
+// Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// MULTI-TENANCY & AUTHENTICATION
+// =============================================================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique // URL-friendly identifier
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users           User[]
+  projects        Project[]
+  regulatoryCodes RegulatoryCode[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  avatarUrl    String?
+  role         UserRole @default(QA_INSPECTOR)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Supabase Auth integration
+  supabaseUserId String? @unique @map("supabase_user_id")
+
+  // Relations
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // User can be assigned to specific projects
+  projectAssignments ProjectAssignment[]
+
+  // Issues assigned to or created by user
+  assignedIssues Issue[] @relation("AssignedTo")
+  createdIssues  Issue[] @relation("CreatedBy")
+  resolvedIssues Issue[] @relation("ResolvedBy")
+
+  // Scans initiated by user
+  scans Scan[]
+
+  // Audit trail - who performed actions
+  auditLogs AuditLog[]
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN           // Full tenant access, can manage users and settings
+  PROJECT_MANAGER // Manages projects, assigns issues, views reports
+  QA_INSPECTOR    // Creates scans, reviews issues, updates status
+  AUDITOR         // Read-only access to compliance records and audit logs
+}
+
+// =============================================================================
+// PROJECTS
+// =============================================================================
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  address     String?
+  status      ProjectStatus @default(ACTIVE)
+  startDate   DateTime?
+  endDate     DateTime?
+
+  // BIM Model reference
+  bimModelUrl String? @map("bim_model_url")
+  bimModelVersion String? @map("bim_model_version")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Users assigned to this project
+  userAssignments ProjectAssignment[]
+
+  // Regulatory codes applicable to this project
+  applicableCodes ProjectRegulatoryCode[]
+
+  // Scans and issues
+  scans  Scan[]
+  issues Issue[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("projects")
+}
+
+model ProjectAssignment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@map("project_assignments")
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+// =============================================================================
+// SCANS (Drone/Robot Data Ingestion)
+// =============================================================================
+
+model Scan {
+  id          String     @id @default(cuid())
+  name        String?    // Optional friendly name
+  status      ScanStatus @default(PENDING)
+  scanType    ScanType   @default(DRONE)
+
+  // Storage references
+  s3Url       String     @map("s3_url")           // Raw scan data location
+  processedUrl String?   @map("processed_url")    // Processed/analyzed data
+  thumbnailUrl String?   @map("thumbnail_url")
+
+  // Metadata
+  capturedAt    DateTime  @map("captured_at")     // When the scan was taken
+  fileSize      BigInt?   @map("file_size")       // Size in bytes
+  metadata      Json?                              // Flexible metadata (coordinates, device info, etc.)
+
+  // Processing info
+  processingStartedAt  DateTime? @map("processing_started_at")
+  processingCompletedAt DateTime? @map("processing_completed_at")
+  errorMessage         String?   @map("error_message")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  uploadedById String @map("uploaded_by_id")
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+
+  // Compliance checks performed on this scan
+  complianceChecks ComplianceCheck[]
+
+  // Issues detected in this scan
+  issues Issue[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([capturedAt])
+  @@map("scans")
+}
+
+enum ScanStatus {
+  PENDING     // Uploaded, awaiting processing
+  PROCESSING  // Currently being analyzed
+  COMPLETED   // Analysis complete
+  FAILED      // Processing failed
+}
+
+enum ScanType {
+  DRONE       // Aerial drone scan
+  ROBOT       // Ground-based robot scan
+  LIDAR       // LiDAR scanning
+  PHOTOGRAMMETRY
+  MANUAL      // Manually uploaded photos/data
+}
+
+// =============================================================================
+// REGULATORY CODES
+// =============================================================================
+
+model RegulatoryCode {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "International Building Code 2024"
+  shortName   String   @map("short_name") // e.g., "IBC 2024"
+  version     String   // e.g., "2024"
+  jurisdiction String? // e.g., "Florida", "International"
+  category    String?  // e.g., "Building", "Fire", "Electrical", "Plumbing"
+
+  // The actual code content/rules (could be structured JSON or reference to external doc)
+  sourceUrl   String?  @map("source_url")
+  content     Json?    // Structured code sections for AI processing
+
+  isActive    Boolean  @default(true)
+  effectiveDate DateTime? @map("effective_date")
+  expirationDate DateTime? @map("expiration_date")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Tenant-specific codes (null tenantId = system-wide codes)
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Projects using this code
+  projectAssignments ProjectRegulatoryCode[]
+
+  // Compliance checks against this code
+  complianceChecks ComplianceCheck[]
+
+  @@unique([shortName, version, tenantId])
+  @@index([tenantId])
+  @@index([category])
+  @@map("regulatory_codes")
+}
+
+// Junction table for projects and their applicable regulatory codes
+model ProjectRegulatoryCode {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  projectId        String
+  project          Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  regulatoryCodeId String         @map("regulatory_code_id")
+  regulatoryCode   RegulatoryCode @relation(fields: [regulatoryCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, regulatoryCodeId])
+  @@map("project_regulatory_codes")
+}
+
+// =============================================================================
+// COMPLIANCE CHECKS (AI Reasoning Engine Results)
+// =============================================================================
+
+model ComplianceCheck {
+  id     String                @id @default(cuid())
+  status ComplianceCheckStatus @default(PENDING)
+
+  // AI Analysis Results
+  overallScore    Float?  @map("overall_score")    // 0-100 compliance score
+  summary         String?                          // AI-generated summary
+  aiModelVersion  String? @map("ai_model_version") // Track which AI model was used
+
+  // Detailed findings stored as JSON
+  findings        Json?   // Array of specific findings with locations, citations
+  rawAiResponse   Json?   @map("raw_ai_response")  // Full AI response for debugging
+
+  // Processing metadata
+  startedAt       DateTime? @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  processingTimeMs Int?     @map("processing_time_ms")
+  errorMessage    String?   @map("error_message")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  scanId String
+  scan   Scan   @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  regulatoryCodeId String         @map("regulatory_code_id")
+  regulatoryCode   RegulatoryCode @relation(fields: [regulatoryCodeId], references: [id])
+
+  // Issues generated from this compliance check
+  issues Issue[]
+
+  // Immutable audit record created on completion
+  auditLogs AuditLog[]
+
+  @@index([scanId])
+  @@index([regulatoryCodeId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("compliance_checks")
+}
+
+enum ComplianceCheckStatus {
+  PENDING     // Queued for processing
+  IN_PROGRESS // AI analysis running
+  COMPLETED   // Analysis complete
+  FAILED      // Processing failed
+}
+
+// =============================================================================
+// ISSUES (Detected Defects)
+// =============================================================================
+
+model Issue {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  status      IssueStatus @default(OPEN)
+  severity    IssueSeverity
+  severityScore Int       @map("severity_score") // 1-100 for granular prioritization
+
+  // Risk factors for prioritization
+  scheduleImpact   ImpactLevel @default(MEDIUM) @map("schedule_impact")
+  safetyImpact     ImpactLevel @default(MEDIUM) @map("safety_impact")
+  costImpact       ImpactLevel @default(MEDIUM) @map("cost_impact")
+
+  // Location data
+  location         String?     // Human-readable location description
+  coordinates      Json?       // { x, y, z } or lat/lng coordinates
+  bimElementId     String?     @map("bim_element_id") // Reference to BIM model element
+
+  // Code reference
+  codeReference    String?     @map("code_reference") // e.g., "IBC 2024 Section 903.2.1"
+
+  // Evidence
+  evidenceUrls     String[]    @map("evidence_urls") // Screenshots, scan excerpts
+  aiAnalysis       String?     @map("ai_analysis")   // AI explanation of the issue
+
+  // Resolution
+  resolution       String?     // How it was resolved
+  resolvedAt       DateTime?   @map("resolved_at")
+
+  // Timestamps
+  detectedAt DateTime  @default(now()) @map("detected_at")
+  dueDate    DateTime? @map("due_date")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Source scan (if detected automatically)
+  scanId String?
+  scan   Scan?   @relation(fields: [scanId], references: [id])
+
+  // Source compliance check (if from AI analysis)
+  complianceCheckId String?         @map("compliance_check_id")
+  complianceCheck   ComplianceCheck? @relation(fields: [complianceCheckId], references: [id])
+
+  // User assignments
+  assignedToId String? @map("assigned_to_id")
+  assignedTo   User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  createdById String @map("created_by_id")
+  createdBy   User   @relation("CreatedBy", fields: [createdById], references: [id])
+
+  resolvedById String? @map("resolved_by_id")
+  resolvedBy   User?   @relation("ResolvedBy", fields: [resolvedById], references: [id])
+
+  // Audit trail for this issue
+  auditLogs AuditLog[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([severity])
+  @@index([severityScore])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@map("issues")
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  IGNORED
+  REOPENED
+}
+
+enum IssueSeverity {
+  CRITICAL  // Immediate safety hazard or major code violation
+  HIGH      // Significant issue requiring prompt attention
+  MEDIUM    // Moderate issue, should be addressed
+  LOW       // Minor issue, can be scheduled
+}
+
+enum ImpactLevel {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  NONE
+}
+
+// =============================================================================
+// AUDIT LOG (Immutable Compliance Record)
+// =============================================================================
+
+// This table is designed to be IMMUTABLE - no updates or deletes in application code
+// Use database triggers or policies to enforce immutability
+
+model AuditLog {
+  id        String        @id @default(cuid())
+  action    AuditAction
+  entity    AuditEntity
+  entityId  String        @map("entity_id")
+
+  // Snapshot of the entity state at the time of the action
+  previousState Json?     @map("previous_state")
+  newState      Json?     @map("new_state")
+
+  // Change details
+  changes       Json?     // Specific fields that changed
+  reason        String?   // Why the action was taken (for status changes, etc.)
+
+  // Metadata
+  ipAddress     String?   @map("ip_address")
+  userAgent     String?   @map("user_agent")
+
+  // Cryptographic integrity (for tamper-proof verification)
+  checksum      String?   // SHA-256 hash of the log entry
+  previousHash  String?   @map("previous_hash") // Hash of previous entry (blockchain-style)
+
+  // Timestamp - using database default for immutability
+  createdAt DateTime @default(now())
+
+  // Relations (nullable for system-generated events)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  // Optional references to related entities for easier querying
+  complianceCheckId String?          @map("compliance_check_id")
+  complianceCheck   ComplianceCheck? @relation(fields: [complianceCheckId], references: [id])
+
+  issueId String?
+  issue   Issue?  @relation(fields: [issueId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([complianceCheckId])
+  @@index([issueId])
+  @@map("audit_logs")
+}
+
+enum AuditAction {
+  // Compliance Check actions
+  COMPLIANCE_CHECK_STARTED
+  COMPLIANCE_CHECK_COMPLETED
+  COMPLIANCE_CHECK_FAILED
+
+  // Issue actions
+  ISSUE_CREATED
+  ISSUE_STATUS_CHANGED
+  ISSUE_ASSIGNED
+  ISSUE_SEVERITY_CHANGED
+  ISSUE_RESOLVED
+  ISSUE_REOPENED
+
+  // Scan actions
+  SCAN_UPLOADED
+  SCAN_PROCESSING_STARTED
+  SCAN_PROCESSING_COMPLETED
+  SCAN_PROCESSING_FAILED
+
+  // Project actions
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_ARCHIVED
+
+  // User/Access actions
+  USER_LOGIN
+  USER_LOGOUT
+  USER_ROLE_CHANGED
+
+  // Regulatory code actions
+  REGULATORY_CODE_ADDED
+  REGULATORY_CODE_UPDATED
+}
+
+enum AuditEntity {
+  COMPLIANCE_CHECK
+  ISSUE
+  SCAN
+  PROJECT
+  USER
+  REGULATORY_CODE
+}
