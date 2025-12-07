@@ -1,227 +1,361 @@
-import { DashboardShell } from "@/app/components/layout";
+"use client";
 
-// Sample stat card component
-function StatCard({
-  title,
-  value,
-  change,
-  changeType,
-  icon,
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { DashboardShell } from "@/app/components/layout";
+import { Plus, Building2, MapPin, Calendar, MoreVertical, Loader2 } from "lucide-react";
+import { getProjects, createProject, deleteProject, type Project } from "@/app/actions/projects";
+
+// =============================================================================
+// Create Project Modal
+// =============================================================================
+
+function CreateProjectModal({
+  isOpen,
+  onClose,
+  onCreated,
 }: {
-  title: string;
-  value: string;
-  change: string;
-  changeType: "positive" | "negative" | "neutral";
-  icon: React.ReactNode;
+  isOpen: boolean;
+  onClose: () => void;
+  onCreated: (project: Project) => void;
 }) {
-  const changeColors = {
-    positive: "text-success",
-    negative: "text-danger",
-    neutral: "text-foreground-muted",
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [address, setAddress] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const project = await createProject({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        address: address.trim() || undefined,
+      });
+      onCreated(project);
+      onClose();
+      // Reset form
+      setName("");
+      setDescription("");
+      setAddress("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create project");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="card p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-foreground-secondary">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{value}</p>
-          <p className={`mt-1 text-sm ${changeColors[changeType]}`}>{change}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-background-secondary border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4">
+        <div className="p-6 border-b border-border">
+          <h2 className="text-xl font-semibold text-foreground">Create New Project</h2>
+          <p className="text-sm text-foreground-muted mt-1">
+            Add a new construction project to track compliance
+          </p>
         </div>
-        <div className="p-3 rounded-lg bg-primary-subtle text-primary">
-          {icon}
-        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="p-6 space-y-4">
+            {error && (
+              <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Project Name <span className="text-danger">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., Metro Station Hub"
+                className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Description
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief description of the project..."
+                rows={3}
+                className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Address
+              </label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g., 1250 Transit Way, Metro City"
+                className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div className="p-6 border-t border-border flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-medium text-foreground-secondary hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !name.trim()}
+              className="px-4 py-2 text-sm font-medium bg-primary hover:bg-primary-hover disabled:bg-primary/50 text-white rounded-lg transition-colors flex items-center gap-2"
+            >
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              Create Project
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 }
 
-// Sample severity badge
-function SeverityBadge({ severity }: { severity: "critical" | "high" | "medium" | "low" }) {
-  const badgeClasses = {
-    critical: "badge-critical",
-    high: "badge-high",
-    medium: "badge-medium",
-    low: "badge-low",
+// =============================================================================
+// Project Card
+// =============================================================================
+
+function ProjectCard({
+  project,
+  onDelete,
+}: {
+  project: Project;
+  onDelete: (id: string) => void;
+}) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this project? This cannot be undone.")) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteProject(project.id);
+      onDelete(project.id);
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+    } finally {
+      setIsDeleting(false);
+      setShowMenu(false);
+    }
   };
 
+  const createdDate = new Date(project.created_at).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClasses[severity]}`}>
-      {severity.charAt(0).toUpperCase() + severity.slice(1)}
-    </span>
+    <div className="group relative bg-background-secondary border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-all duration-200">
+      {/* Cover Image */}
+      <div className="aspect-video bg-surface relative overflow-hidden">
+        {project.cover_image_url ? (
+          <img
+            src={project.cover_image_url}
+            alt={project.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+            <Building2 className="w-12 h-12 text-primary/40" />
+          </div>
+        )}
+
+        {/* Menu Button */}
+        <div className="absolute top-2 right-2">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              setShowMenu(!showMenu);
+            }}
+            className="p-1.5 rounded-lg bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+
+          {showMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowMenu(false)}
+              />
+              <div className="absolute right-0 top-full mt-1 z-20 bg-background-secondary border border-border rounded-lg shadow-lg py-1 min-w-[120px]">
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/10 transition-colors flex items-center gap-2"
+                >
+                  {isDeleting ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : null}
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Content */}
+      <Link href={`/project/${project.id}/hub`} className="block p-4">
+        <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+          {project.name}
+        </h3>
+
+        {project.description && (
+          <p className="text-sm text-foreground-muted mt-1 line-clamp-2">
+            {project.description}
+          </p>
+        )}
+
+        <div className="mt-3 flex items-center gap-4 text-xs text-foreground-muted">
+          {project.address && (
+            <div className="flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              <span className="truncate max-w-[150px]">{project.address}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            <span>{createdDate}</span>
+          </div>
+        </div>
+      </Link>
+    </div>
   );
 }
 
+// =============================================================================
+// Empty State
+// =============================================================================
+
+function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+        <Building2 className="w-10 h-10 text-primary" />
+      </div>
+      <h3 className="text-xl font-semibold text-foreground mb-2">No projects yet</h3>
+      <p className="text-foreground-muted text-center max-w-md mb-6">
+        Create your first project to start tracking construction compliance with AI-powered regulatory analysis.
+      </p>
+      <button
+        onClick={onCreateClick}
+        className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white font-medium rounded-lg transition-colors"
+      >
+        <Plus className="w-5 h-5" />
+        Create Your First Project
+      </button>
+    </div>
+  );
+}
+
+// =============================================================================
+// Main Dashboard
+// =============================================================================
+
 export default function DashboardPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      const data = await getProjects();
+      setProjects(data);
+    } catch (err) {
+      console.error("Failed to load projects:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleProjectCreated = (project: Project) => {
+    setProjects((prev) => [project, ...prev]);
+  };
+
+  const handleProjectDeleted = (id: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+  };
+
   return (
     <DashboardShell
-      title="Dashboard"
-      description="Overview of your construction QA operations"
+      title="Projects"
+      description="Manage your construction projects"
       actions={
-        <button className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors">
-          New Scan
-        </button>
+        projects.length > 0 && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white font-medium text-sm rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Project
+          </button>
+        )
       }
     >
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          title="Active Projects"
-          value="12"
-          change="+2 this month"
-          changeType="positive"
-          icon={
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="Open Issues"
-          value="47"
-          change="-8 from last week"
-          changeType="positive"
-          icon={
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="Compliance Score"
-          value="94.2%"
-          change="+1.3% improvement"
-          changeType="positive"
-          icon={
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="Scans This Week"
-          value="28"
-          change="On track"
-          changeType="neutral"
-          icon={
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Issues */}
-        <div className="lg:col-span-2 card p-0">
-          <div className="p-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">Critical Issues</h2>
-            <p className="text-sm text-foreground-muted">Issues requiring immediate attention</p>
-          </div>
-          <div className="divide-y divide-border">
-            {[
-              { id: "ISS-001", title: "Fire exit clearance violation - Building A", severity: "critical" as const, project: "Downtown Tower", time: "2h ago" },
-              { id: "ISS-002", title: "Structural beam misalignment detected", severity: "high" as const, project: "Metro Plaza", time: "4h ago" },
-              { id: "ISS-003", title: "Electrical conduit spacing non-compliant", severity: "high" as const, project: "Downtown Tower", time: "6h ago" },
-              { id: "ISS-004", title: "Ventilation duct obstruction", severity: "medium" as const, project: "Harbor View", time: "8h ago" },
-              { id: "ISS-005", title: "Minor concrete surface defect", severity: "low" as const, project: "Metro Plaza", time: "12h ago" },
-            ].map((issue) => (
-              <div key={issue.id} className="p-4 hover:bg-surface-hover transition-colors cursor-pointer">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-mono text-foreground-muted">{issue.id}</span>
-                      <SeverityBadge severity={issue.severity} />
-                    </div>
-                    <p className="text-sm font-medium text-foreground truncate">{issue.title}</p>
-                    <p className="text-xs text-foreground-muted mt-1">{issue.project}</p>
-                  </div>
-                  <span className="text-xs text-foreground-muted whitespace-nowrap">{issue.time}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="p-4 border-t border-border">
-            <button className="text-sm text-primary hover:text-primary-hover font-medium transition-colors">
-              View all issues →
-            </button>
-          </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
-
-        {/* Recent Scans */}
-        <div className="card p-0">
-          <div className="p-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">Recent Scans</h2>
-            <p className="text-sm text-foreground-muted">Latest drone capture activity</p>
-          </div>
-          <div className="divide-y divide-border">
-            {[
-              { name: "Downtown Tower - Floor 12", status: "completed", score: 96, time: "1h ago" },
-              { name: "Metro Plaza - Exterior", status: "processing", score: null, time: "2h ago" },
-              { name: "Harbor View - Foundation", status: "completed", score: 89, time: "5h ago" },
-              { name: "Downtown Tower - Floor 11", status: "completed", score: 94, time: "8h ago" },
-            ].map((scan, i) => (
-              <div key={i} className="p-4 hover:bg-surface-hover transition-colors cursor-pointer">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{scan.name}</p>
-                    <p className="text-xs text-foreground-muted mt-1">{scan.time}</p>
-                  </div>
-                  {scan.status === "completed" ? (
-                    <div className="flex items-center gap-2">
-                      <div className="status-dot status-dot-success" />
-                      <span className="text-sm font-medium text-success">{scan.score}%</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <div className="status-dot status-dot-info animate-pulse-status" />
-                      <span className="text-sm text-info">Processing</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="p-4 border-t border-border">
-            <button className="text-sm text-primary hover:text-primary-hover font-medium transition-colors">
-              View all scans →
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Compliance Overview */}
-      <div className="mt-6 card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Compliance by Code</h2>
-            <p className="text-sm text-foreground-muted">Regulatory compliance status across active projects</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { code: "IBC 2024", compliance: 96, checks: 124 },
-            { code: "Florida Building Code", compliance: 94, checks: 89 },
-            { code: "NFPA 101", compliance: 98, checks: 56 },
-            { code: "ADA Standards", compliance: 91, checks: 78 },
-          ].map((item) => (
-            <div key={item.code} className="p-4 bg-surface-hover rounded-lg border border-border">
-              <p className="text-sm font-medium text-foreground">{item.code}</p>
-              <div className="mt-3 flex items-end justify-between">
-                <span className="text-2xl font-bold text-foreground">{item.compliance}%</span>
-                <span className="text-xs text-foreground-muted">{item.checks} checks</span>
-              </div>
-              <div className="mt-2 h-1.5 bg-surface rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-primary to-success rounded-full transition-all duration-500"
-                  style={{ width: `${item.compliance}%` }}
-                />
-              </div>
-            </div>
+      ) : projects.length === 0 ? (
+        <EmptyState onCreateClick={() => setIsModalOpen(true)} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onDelete={handleProjectDeleted}
+            />
           ))}
         </div>
-      </div>
+      )}
+
+      <CreateProjectModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onCreated={handleProjectCreated}
+      />
     </DashboardShell>
   );
 }

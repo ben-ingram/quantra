@@ -1,13 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx prisma:*)",
-      "Bash(cat:*)",
-      "Bash(npx tsx:*)",
-      "Bash(node -e:*)",
-      "Bash(curl:*)",
-      "Bash(git add:*)",
-      "Bash(git reset:*)"
+      "Bash(npm run build:*)",
+      "Bash(ls:*)",
+      "Bash(dir \"C:\\Users\\Ben\\projects\\quantra\\node_modules\\web-ifc\")",
+      "Bash(dir:*)",
+      "Bash(copy \"C:\\Users\\Ben\\projects\\quantra\\node_modules\\web-ifc\\web-ifc.wasm\" \"C:\\Users\\Ben\\projects\\quantra\\public\\wasm\\web-ifc.wasm\")",
+      "Bash(copy:*)",
+      "Bash(tee:*)",
+      "Bash(echo:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": [],
     "ask": []

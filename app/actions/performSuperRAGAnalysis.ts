@@ -278,6 +278,11 @@ function parseAnalystResponse(
     recommendations: Array.isArray(parsed.recommendations)
       ? parsed.recommendations.map(String)
       : ["Provide more specific details about the building element for accurate analysis."],
+    codeReference: {
+      name: "Florida Building Code",
+      version: "8th Edition (2023)",
+      jurisdiction: "Florida",
+    },
     confidence,
     allCitations: Array.isArray(parsed.allCitations)
       ? parsed.allCitations.map(String)
@@ -315,7 +320,7 @@ export async function performSuperRAGAnalysis(
 
   // Step 1: Retrieve compliance data using hybrid search
   console.log("[SuperRAG] Retrieving compliance data...");
-  const retrievalResult = await retrieveComplianceData(input.query, {
+  const retrievalResult = await retrieveComplianceData(input.query, undefined, {
     jurisdiction: input.jurisdiction,
     codeName: input.codeName,
     textMatchCount: input.textMatchCount ?? 8,
@@ -357,6 +362,7 @@ export async function performSuperRAGAnalysis(
   // Step 5: Build code snippets from retrieved text chunks
   const codeSnippets: RegulatoryCodeSnippet[] = retrievalResult.textChunks.map(
     (chunk) => ({
+      codeId: chunk.codeName || "FBC",
       codeName: chunk.codeName || "Unknown",
       version: chunk.codeVersion || "Unknown",
       jurisdiction: chunk.jurisdiction || "Unknown",
@@ -382,7 +388,11 @@ export async function performSuperRAGAnalysis(
             version: primaryChunk.codeVersion || "Unknown",
             jurisdiction: primaryChunk.jurisdiction || "Unknown",
           }
-        : undefined,
+        : {
+            name: "Florida Building Code",
+            version: "8th Edition (2023)",
+            jurisdiction: "Florida",
+          },
     },
     metadata: {
       timestamp: new Date().toISOString(),

@@ -355,6 +355,7 @@ export async function performRAGAnalysis(
 
   // Step 6: Build code snippets from retrieved documents
   const codeSnippets: RegulatoryCodeSnippet[] = documents.map((doc) => ({
+    codeId: doc.metadata.code_name || "FBC",
     codeName: doc.metadata.code_name || "Unknown",
     version: doc.metadata.code_version || "Unknown",
     jurisdiction: doc.metadata.jurisdiction || "Unknown",

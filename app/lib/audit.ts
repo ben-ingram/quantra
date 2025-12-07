@@ -44,7 +44,7 @@ export interface AuditLogResult {
   id: string;
   checksum: string;
   previousHash: string | null;
-  createdAt: Date;
+  createdAt: Date | null;
 }
 
 // ============================================================================
@@ -153,9 +153,9 @@ export async function logAuditTrail(input: AuditLogInput): Promise<AuditLogResul
       action: input.action,
       entity: input.entity,
       entityId: input.entityId,
-      previousState: input.previousState ?? undefined,
-      newState: input.newState ?? undefined,
-      changes: input.changes ?? undefined,
+      previousState: (input.previousState ?? undefined) as object | undefined,
+      newState: (input.newState ?? undefined) as object | undefined,
+      changes: (input.changes ?? undefined) as object | undefined,
       reason: input.reason,
       userId: input.userId,
       complianceCheckId: input.complianceCheckId,
@@ -173,7 +173,7 @@ export async function logAuditTrail(input: AuditLogInput): Promise<AuditLogResul
     },
   });
 
-  return auditLog;
+  return auditLog as AuditLogResult;
 }
 
 // ============================================================================

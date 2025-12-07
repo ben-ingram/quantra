@@ -2,7 +2,7 @@
 ## A Plain-Language Guide to Our AI-Powered Compliance Analysis
 
 **For:** Non-Technical Stakeholders, Business Partners, Investors
-**Version:** 1.1
+**Version:** 2.0
 **Last Updated:** December 2024
 
 ---
@@ -11,7 +11,11 @@
 
 **SUPER RAG** stands for **Structured Understanding with Prioritized Evidence Retrieval and Augmented Generation**.
 
-In simple terms, it's Quantra's intelligent system that can instantly determine whether a building element meets regulatory code requirements. Think of it as a tireless, expert building inspector who has memorized every page of the Florida Building Code and can provide detailed analysis in seconds.
+In simple terms, it's Quantra's intelligent system that can instantly determine whether a building element meets BOTH:
+1. **Your project's specifications** (what you designed)
+2. **Building code requirements** (what the law requires)
+
+Think of it as a tireless, expert building inspector who has memorized every page of your project specs AND the Florida Building Code, and can instantly tell you which limit governs.
 
 ---
 
@@ -32,28 +36,63 @@ Before SUPER RAG, checking building code compliance required:
 ### With SUPER RAG
 
 1. **Ask a question** in plain English
-2. **Get an instant answer** with citations
-3. **See risk assessment** and recommendations
-4. **Review supporting evidence** from the actual code
+2. **Get an instant answer** checking BOTH your specs AND the code
+3. **See which limit governs** (design spec or code minimum)
+4. **Get risk assessment** and recommendations
+5. **Review supporting evidence** from both sources
 
-**Result:** Seconds instead of hours, consistent accuracy, full documentation
+**Result:** Seconds instead of hours, checks both sources, reports governing limit
 
 ---
 
 ## How It Works: The Complete Picture
 
 SUPER RAG has two main parts:
-1. **Getting codes into the system** (happens once per code book)
-2. **Answering your questions** (happens every time you ask)
+1. **Getting documents into the system** (project specs + building codes)
+2. **Answering your questions** (checking both sources)
 
-### Part 1: Loading Building Codes Into the System
+### Part 1: Loading Documents Into the System
 
-Before SUPER RAG can answer questions, it needs to "learn" the building codes. Here's what happens:
+Before SUPER RAG can answer questions, it needs to "learn" BOTH your project specs AND the building codes:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                                                                     │
-│   THE LEARNING PROCESS (One-Time Setup)                            │
+│   THE DUAL-SOURCE LEARNING PROCESS                                 │
+│                                                                     │
+│   ══════════════════════════════════════════════════════════════   │
+│   SOURCE 1: YOUR PROJECT SPECIFICATIONS (The Design Target)        │
+│   ══════════════════════════════════════════════════════════════   │
+│                                                                     │
+│   ┌─────────────────┐                                              │
+│   │ Project Spec    │                                              │
+│   │ PDFs (CSI)      │                                              │
+│   │ (50-500 pages)  │                                              │
+│   └────────┬────────┘                                              │
+│            │                                                        │
+│            ▼                                                        │
+│   ┌─────────────────────────────────────────────────────────┐      │
+│   │ UPLOAD IN "DEFINE" PHASE                                │      │
+│   │                                                         │      │
+│   │ The system extracts:                                    │      │
+│   │ • CSI Division (e.g., "05 51 00 - Metal Stairs")       │      │
+│   │ • Parameter Name (e.g., "Riser Height")                │      │
+│   │ • Min/Max/Target Values (e.g., "4-7 inches")           │      │
+│   │ • Units (e.g., "inches", "psi")                        │      │
+│   └─────────────────────────────────────────────────────────┘      │
+│            │                                                        │
+│            ▼                                                        │
+│   ┌────────────────────────┐                                       │
+│   │ project_specs TABLE    │  ← Stored PER PROJECT                 │
+│   │                        │                                       │
+│   │ Your specific design   │                                       │
+│   │ requirements that may  │                                       │
+│   │ be STRICTER than code  │                                       │
+│   └────────────────────────┘                                       │
+│                                                                     │
+│   ══════════════════════════════════════════════════════════════   │
+│   SOURCE 2: BUILDING CODES (The Legal Minimum)                     │
+│   ══════════════════════════════════════════════════════════════   │
 │                                                                     │
 │   ┌─────────────────┐                                              │
 │   │ Florida Building│                                              │
@@ -62,59 +101,20 @@ Before SUPER RAG can answer questions, it needs to "learn" the building codes. H
 │   └────────┬────────┘                                              │
 │            │                                                        │
 │            ▼                                                        │
-│   ┌─────────────────────────────────────────────────────────┐      │
-│   │ STEP 1: READ THE PDF                                    │      │
-│   │                                                         │      │
-│   │ Our system reads every page of the building code,       │      │
-│   │ just like a human would - but much faster.              │      │
-│   └─────────────────────────────────────────────────────────┘      │
-│            │                                                        │
-│            ▼                                                        │
-│   ┌─────────────────────────────────────────────────────────┐      │
-│   │ STEP 2: BREAK INTO CHUNKS                               │      │
-│   │                                                         │      │
-│   │ The code is split into smaller pieces (about 1,000     │      │
-│   │ characters each) that are easier to search.             │      │
-│   │                                                         │      │
-│   │ Each chunk remembers:                                   │      │
-│   │ • Which section it came from (e.g., "1011.10")         │      │
-│   │ • The section title (e.g., "Spiral Stairways")         │      │
-│   │ • What page number it was on                           │      │
-│   └─────────────────────────────────────────────────────────┘      │
-│            │                                                        │
-│            ▼                                                        │
-│   ┌─────────────────────────────────────────────────────────┐      │
-│   │ STEP 3: CREATE "MEANING FINGERPRINTS"                   │      │
-│   │                                                         │      │
-│   │ Each chunk gets converted into a special mathematical   │      │
-│   │ code (called an "embedding") that captures its meaning. │      │
-│   │                                                         │      │
-│   │ This is the magic that lets us find relevant content    │      │
-│   │ even when you use different words than the code uses.   │      │
-│   │                                                         │      │
-│   │ Example: "spiral staircase" finds "helical stairs"      │      │
-│   └─────────────────────────────────────────────────────────┘      │
-│            │                                                        │
-│            ├────────────────────────────────┐                      │
-│            ▼                                ▼                      │
-│   ┌────────────────────────┐    ┌────────────────────────┐        │
-│   │ TEXT DATABASE          │    │ TABLES DATABASE        │        │
-│   │                        │    │                        │        │
-│   │ All the written rules  │    │ Important tables with  │        │
-│   │ from the code, ready   │    │ exact numbers, stored  │        │
-│   │ to be searched.        │    │ in a special format.   │        │
-│   │                        │    │                        │        │
-│   │ ~3,000+ chunks         │    │ Occupancy limits,      │        │
-│   │                        │    │ stair dimensions,      │        │
-│   │                        │    │ egress widths, etc.    │        │
-│   └────────────────────────┘    └────────────────────────┘        │
+│   ┌────────────────────────┐                                       │
+│   │ code_sections TABLE    │  ← Shared across projects             │
+│   │                        │                                       │
+│   │ The legal baseline     │                                       │
+│   │ that EVERY building    │                                       │
+│   │ must meet at minimum   │                                       │
+│   └────────────────────────┘                                       │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Part 2: Answering Your Questions
+### Part 2: Answering Your Questions (Dual-Source Retrieval)
 
-Once the codes are loaded, here's what happens when you ask a question:
+Once the documents are loaded, here's what happens when you ask a question:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -517,6 +517,6 @@ When the AI returns incomplete information, the system fills in sensible default
 
 ---
 
-**Document Version:** 1.1
+**Document Version:** 2.0
 **Classification:** External - Business Stakeholders
 **Copyright:** Quantra, Inc. All Rights Reserved.

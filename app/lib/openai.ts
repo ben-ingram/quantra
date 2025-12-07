@@ -14,4 +14,6 @@ export const MODELS = {
   REASONING: "gpt-4o",
   // GPT-4o-mini for faster, simpler tasks
   FAST: "gpt-4o-mini",
+  // GPT-4o for vision tasks (image analysis)
+  VISION: "gpt-4o",
 } as const;

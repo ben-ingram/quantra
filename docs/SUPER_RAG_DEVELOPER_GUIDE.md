@@ -1,7 +1,7 @@
 # SUPER RAG Developer Guide
 ## Quantra's Hybrid Retrieval-Augmented Generation System for Regulatory Compliance Analysis
 
-**Version:** 1.1
+**Version:** 2.0
 **Last Updated:** December 2024
 **Authors:** Quantra Engineering Team
 
@@ -28,16 +28,28 @@
 
 SUPER RAG (Structured Understanding with Prioritized Evidence Retrieval and Augmented Generation) is Quantra's proprietary compliance analysis system that combines:
 
-- **PDF Ingestion Pipeline** (Python-based document processing)
+- **Dual-Source Architecture** (Design Specs + Building Codes)
+- **PDF Ingestion Pipeline** (TypeScript-based with CSI section extraction)
 - **Semantic Vector Search** (pgvector with HNSW indexing)
 - **Full-Text Keyword Search** (PostgreSQL tsvector/tsquery)
 - **Structured Data Retrieval** (JSONB tables with numeric lookups)
-- **Intelligent Data Hierarchy** (Tables > Specific Rules > General Text)
+- **Intelligent Data Hierarchy** (Design Specs > Code Tables > Specific Rules > General Text)
 - **Query Interpretation Logic** (Conditions vs. Requirements)
 - **LLM-Powered Analysis** (GPT-4o with specialized prompting)
 - **Robust Response Parsing** (Graceful handling of edge cases)
 
-The system analyzes construction defects against regulatory codes (primarily Florida Building Code) with unprecedented accuracy by intelligently combining multiple retrieval strategies and enforcing a strict evidence hierarchy.
+The system analyzes construction elements against BOTH project specifications (the design target) AND regulatory codes (the legal minimum), reporting which limit governs.
+
+### Critical Architecture: Dual-Source Retrieval
+
+**NEW in v2.0:** SUPER RAG now queries two separate data sources in parallel:
+
+| Source | Table | Purpose | Priority |
+|--------|-------|---------|----------|
+| **Design Requirements** | `project_specs` | Project-specific specs from CSI MasterFormat PDFs | **Higher** (when stricter) |
+| **Code Requirements** | `code_sections` | Florida Building Code regulatory text | **Baseline** (legal minimum) |
+
+The LLM is instructed: *"Compare Design Requirements against Code Requirements. Design specs override code when stricter. Report BOTH limits."*
 
 ---
 
@@ -45,34 +57,53 @@ The system analyzes construction defects against regulatory codes (primarily Flo
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      SUPER RAG COMPLETE ARCHITECTURE                        │
+│                   SUPER RAG v2.0 COMPLETE ARCHITECTURE                      │
+│                   (Dual-Source: Design Specs + Building Codes)              │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-                              INGESTION FLOW
-                              ==============
+                         DUAL INGESTION PIPELINES
+                         ========================
 
-┌─────────────┐     ┌─────────────────────────────────────────────────────────┐
-│   PDF       │     │              INGESTION PIPELINE (Python)                │
-│   Building  │────▶│                    ingest.py                            │
-│   Codes     │     │                                                         │
-└─────────────┘     │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐ │
-                    │  │ PDF Loader  │─▶│ Text        │─▶│ Section         │ │
-                    │  │ (PyPDF)     │  │ Splitter    │  │ Extractor       │ │
-                    │  └─────────────┘  └─────────────┘  └─────────────────┘ │
-                    │                                            │            │
-                    │                                            ▼            │
-                    │  ┌─────────────────────────────────────────────────┐   │
-                    │  │           OpenAI Embedding Generator            │   │
-                    │  │           text-embedding-3-small (1536d)        │   │
-                    │  └─────────────────────────────────────────────────┘   │
-                    │                          │                              │
-                    │         ┌────────────────┴────────────────┐            │
-                    │         ▼                                 ▼            │
-                    │  ┌─────────────────┐           ┌──────────────────┐   │
-                    │  │  code_sections  │           │   code_tables    │   │
-                    │  │  (Text Chunks)  │           │ (Structured JSON)│   │
-                    │  └─────────────────┘           └──────────────────┘   │
-                    └─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  ┌─────────────┐     ┌─────────────────────────────────────────────────┐   │
+│  │ PROJECT     │     │     PROJECT SPEC INGESTION (TypeScript)         │   │
+│  │ SPEC PDFs   │────▶│     ingestProjectSpecs() Server Action          │   │
+│  │ (CSI Docs)  │     │                                                 │   │
+│  └─────────────┘     │  ┌─────────────┐  ┌─────────────┐  ┌─────────┐ │   │
+│                      │  │ PDF Extract │─▶│ CSI Section │─▶│ OpenAI  │ │   │
+│                      │  │ (unpdf)     │  │ Chunking    │  │ Extract │ │   │
+│                      │  └─────────────┘  └─────────────┘  └────┬────┘ │   │
+│                      │                                         │      │   │
+│                      │                                         ▼      │   │
+│                      │  ┌───────────────────────────────────────────┐ │   │
+│                      │  │           project_specs TABLE             │ │   │
+│                      │  │  • csi_division, section_title            │ │   │
+│                      │  │  • parameter_name, requirement_text       │ │   │
+│                      │  │  • min_value, max_value, target_value     │ │   │
+│                      │  │  • embedding (vector 1536)                │ │   │
+│                      │  └───────────────────────────────────────────┘ │   │
+│                      └─────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────┐     ┌─────────────────────────────────────────────────┐   │
+│  │ BUILDING    │     │     BUILDING CODE INGESTION (Python)            │   │
+│  │ CODE PDFs   │────▶│     scripts/ingest.py                           │   │
+│  │ (FBC, etc.) │     │                                                 │   │
+│  └─────────────┘     │  ┌─────────────┐  ┌─────────────┐  ┌─────────┐ │   │
+│                      │  │ PDF Loader  │─▶│ Text        │─▶│ Section │ │   │
+│                      │  │ (PyPDF)     │  │ Splitter    │  │ Extract │ │   │
+│                      │  └─────────────┘  └─────────────┘  └────┬────┘ │   │
+│                      │                                         │      │   │
+│                      │                                         ▼      │   │
+│                      │  ┌───────────────────────────────────────────┐ │   │
+│                      │  │           code_sections TABLE             │ │   │
+│                      │  │  BUILDING CODES ONLY (FBC, IBC, etc.)     │ │   │
+│                      │  │  • section_number, section_title          │ │   │
+│                      │  │  • content, embedding, fts_vector         │ │   │
+│                      │  └───────────────────────────────────────────┘ │   │
+│                      └─────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
                                               │
                                               ▼
                               QUERY FLOW (Runtime)
@@ -109,10 +140,22 @@ The system analyzes construction defects against regulatory codes (primarily Flo
 │  │              retrieveComplianceData.ts (Phase 3: Router)            │   │
 │  │                                                                     │   │
 │  │  - Generates query embedding via OpenAI                            │   │
-│  │  - Executes PARALLEL hybrid searches:                              │   │
-│  │    • Text chunks (threshold: 0.5, count: 8)                        │   │
-│  │    • Structured tables (threshold: 0.82, count: 3)                 │   │
-│  │  - Formats context for LLM consumption                             │   │
+│  │  - Executes PARALLEL dual-source searches:                         │   │
+│  │                                                                     │   │
+│  │    STEP A: DESIGN REQUIREMENTS (project_specs)                     │   │
+│  │    • Vector similarity search on project_specs                     │   │
+│  │    • Filter by projectId                                           │   │
+│  │    • Returns top 3 matches with CSI division, min/max values       │   │
+│  │                                                                     │   │
+│  │    STEP B: CODE REQUIREMENTS (code_sections)                       │   │
+│  │    • Hybrid search (vector + keyword)                              │   │
+│  │    • Filter by libraryId (FBC, IBC, etc.)                          │   │
+│  │    • Returns top 8 matches with chapter routing                    │   │
+│  │                                                                     │   │
+│  │    STEP C: CONTEXT ASSEMBLY                                        │   │
+│  │    • Combines both sets into structured context                    │   │
+│  │    • Labels: "Design Requirements" vs "Code Requirements"          │   │
+│  │    • Instruction: Design overrides Code when stricter              │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                             │
@@ -127,27 +170,27 @@ The system analyzes construction defects against regulatory codes (primarily Flo
 │  - Semantic similarity encoding     │   │  │    + pgvector extension     │   │
 │                                     │   │  │                             │   │
 └─────────────────────────────────────┘   │  │  ┌─────────────────────┐   │   │
-                                          │  │  │   code_sections     │   │   │
-                                          │  │  │   - content         │   │   │
-                                          │  │  │   - embedding       │   │   │
-                                          │  │  │   - fts_vector      │   │   │
-                                          │  │  │   - section_number  │   │   │
-                                          │  │  │   - section_title   │   │   │
+                                          │  │  │  project_specs      │   │   │
+                                          │  │  │  (DESIGN TARGET)    │   │   │
+                                          │  │  │  - project_id (FK)  │   │   │
+                                          │  │  │  - csi_division     │   │   │
+                                          │  │  │  - min/max/target   │   │   │
+                                          │  │  │  - embedding        │   │   │
                                           │  │  └─────────────────────┘   │   │
                                           │  │                             │   │
                                           │  │  ┌─────────────────────┐   │   │
-                                          │  │  │   code_tables       │   │   │
-                                          │  │  │   - table_id        │   │   │
-                                          │  │  │   - summary         │   │   │
-                                          │  │  │   - data (JSONB)    │   │   │
+                                          │  │  │   code_sections     │   │   │
+                                          │  │  │   (LEGAL MINIMUM)   │   │   │
+                                          │  │  │   - content         │   │   │
                                           │  │  │   - embedding       │   │   │
+                                          │  │  │   - section_number  │   │   │
                                           │  │  └─────────────────────┘   │   │
                                           │  │                             │   │
                                           │  │  ┌─────────────────────┐   │   │
                                           │  │  │   RPC Functions     │   │   │
-                                          │  │  │   - hybrid_search() │   │   │
-                                          │  │  │   - search_code_    │   │   │
-                                          │  │  │     tables()        │   │   │
+                                          │  │  │ - search_project_   │   │   │
+                                          │  │  │   specs()           │   │   │
+                                          │  │  │ - hybrid_search()   │   │   │
                                           │  │  └─────────────────────┘   │   │
                                           │  └─────────────────────────────┘   │
                                           └─────────────────────────────────────┘
@@ -763,13 +806,24 @@ DATABASE_URL=postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true
 
 | File | Purpose |
 |------|---------|
-| `scripts/ingest.py` | PDF ingestion pipeline |
+| `scripts/ingest.py` | Building Code PDF ingestion pipeline |
+| `app/actions/spec-ingestion.ts` | Project Spec PDF ingestion (TypeScript) |
 | `app/actions/performSuperRAGAnalysis.ts` | Analyst (orchestration + LLM) |
-| `app/actions/retrieveComplianceData.ts` | Router (retrieval logic) |
+| `app/actions/retrieveComplianceData.ts` | Dual-source retrieval (specs + codes) |
+| `app/actions/quality-manual.ts` | ITP generation from specs |
 | `app/components/dashboard/ComplianceAnalyzer.tsx` | UI component |
 | `app/lib/openai.ts` | OpenAI client configuration |
 
+### Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `project_specs` | Project specifications (CSI MasterFormat) - THE DESIGN TARGET |
+| `code_sections` | Building code text (FBC, IBC) - THE LEGAL MINIMUM |
+| `code_tables` | Structured tables from building codes (JSONB) |
+| `inspection_test_plans` | Generated ITPs linked to specs via `spec_source_id` |
+
 ---
 
-**Document Version:** 1.1
+**Document Version:** 2.0
 **Copyright:** Quantra, Inc. All Rights Reserved.

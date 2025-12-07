@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "50mb", // Increased from 1MB default for BIM file uploads
+    },
+  },
 };
 
 export default nextConfig;

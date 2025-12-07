@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { analyzeCompliance } from "@/app/actions/analyzeCompliance";
 import { performSuperRAGAnalysis } from "@/app/actions/performSuperRAGAnalysis";
@@ -26,9 +26,13 @@ interface SuperRAGResponse extends FullComplianceResponse {
 // =============================================================================
 
 interface ComplianceAnalyzerProps {
-  projectId: string;
+  projectId?: string;
   scanId?: string;
   jurisdiction?: string;
+  /** Initial query to pre-fill and auto-run */
+  initialQuery?: string;
+  /** If true, shows inline instead of as a modal trigger button */
+  inline?: boolean;
 }
 
 type AnalysisState = "idle" | "analyzing" | "success" | "error";
@@ -73,18 +77,93 @@ export function ComplianceAnalyzer({
   projectId,
   scanId,
   jurisdiction = "Florida",
+  initialQuery,
+  inline = false,
 }: ComplianceAnalyzerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [state, setState] = useState<AnalysisState>("idle");
   const [selectedDefect, setSelectedDefect] = useState(SAMPLE_DEFECTS[0]);
-  const [customDefect, setCustomDefect] = useState("");
-  const [useCustom, setUseCustom] = useState(false);
+  const [customDefect, setCustomDefect] = useState(initialQuery || "");
+  const [useCustom, setUseCustom] = useState(!!initialQuery);
   const [useRAG, setUseRAG] = useState(true); // Default to SUPER RAG analysis
   const [result, setResult] = useState<SuperRAGResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(inline); // Auto-open if inline mode
+
+  // Track if we've auto-run for this initialQuery
+  const hasAutoRun = useRef(false);
+  const lastInitialQuery = useRef(initialQuery);
+
+  // Auto-run analysis when initialQuery changes
+  useEffect(() => {
+    if (initialQuery && initialQuery !== lastInitialQuery.current) {
+      // Reset for new query
+      hasAutoRun.current = false;
+      lastInitialQuery.current = initialQuery;
+      setCustomDefect(initialQuery);
+      setUseCustom(true);
+      setState("idle");
+      setResult(null);
+      setError(null);
+    }
+
+    if (initialQuery && !hasAutoRun.current && state === "idle") {
+      hasAutoRun.current = true;
+      // Auto-run after a short delay to allow UI to render
+      const timer = setTimeout(() => {
+        handleAnalyzeWithQuery(initialQuery);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialQuery, state]);
+
+  const handleAnalyzeWithQuery = async (query: string) => {
+    if (!query.trim()) {
+      setError("Please enter a defect description");
+      return;
+    }
+
+    setState("analyzing");
+    setError(null);
+    setResult(null);
+
+    try {
+      let response: SuperRAGResponse;
+
+      if (useRAG) {
+        response = await performSuperRAGAnalysis({
+          query,
+          jurisdiction,
+          textMatchCount: 8,
+          tableMatchThreshold: 0.82,
+        });
+      } else {
+        const mockResponse = await analyzeCompliance({
+          defectDescription: query,
+          jurisdiction,
+          projectContext: {
+            buildingType: "Mixed-use Transit Development",
+            occupancyType: "Assembly/Residential",
+            constructionPhase: "Active Construction",
+          },
+        });
+        response = mockResponse as SuperRAGResponse;
+      }
+
+      setResult(response);
+      setState("success");
+
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err) {
+      console.error("[ComplianceAnalyzer] Analysis failed:", err);
+      setError(err instanceof Error ? err.message : "Analysis failed");
+      setState("error");
+    }
+  };
 
   const handleAnalyze = async () => {
     const defectDescription = useCustom ? customDefect : selectedDefect.description;
@@ -144,6 +223,60 @@ export function ComplianceAnalyzer({
     setError(null);
   };
 
+  // Inline mode - render directly without modal wrapper
+  if (inline) {
+    return (
+      <div className="rounded-xl border border-border bg-surface shadow-lg overflow-hidden">
+        {/* Inline Header */}
+        <div className="flex items-center gap-3 p-4 border-b border-border bg-surface-hover/30">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-accent/20 text-accent">
+            <SparklesIcon />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-foreground">
+              AI Compliance Analysis
+            </h2>
+            <p className="text-sm text-foreground-muted">
+              Analyzing against {jurisdiction} building codes
+            </p>
+          </div>
+        </div>
+
+        {/* Query Display */}
+        {initialQuery && (
+          <div className="px-4 py-3 bg-primary/5 border-b border-border">
+            <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Query</p>
+            <p className="text-sm text-foreground font-medium">{initialQuery}</p>
+          </div>
+        )}
+
+        {/* Body */}
+        <div className="p-4">
+          {state === "analyzing" ? (
+            <AnalyzingState />
+          ) : state === "success" && result ? (
+            <ResultView result={result} />
+          ) : state === "error" ? (
+            <div className="p-4 rounded-lg bg-danger/10 border border-danger/30">
+              <p className="text-danger text-sm">{error}</p>
+              <button
+                onClick={() => initialQuery && handleAnalyzeWithQuery(initialQuery)}
+                className="mt-3 px-4 py-2 text-sm font-medium rounded-lg bg-danger/20 text-danger hover:bg-danger/30 transition-colors"
+              >
+                Retry Analysis
+              </button>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-foreground-muted">
+              <p>Select an element and click &quot;Run Compliance Check&quot;</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Modal mode (original behavior)
   return (
     <>
       {/* Trigger Button */}

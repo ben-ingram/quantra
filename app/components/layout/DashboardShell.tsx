@@ -27,6 +27,8 @@ interface DashboardShellProps {
   title?: string;
   description?: string;
   actions?: React.ReactNode;
+  /** Hide the page header section (title, description, actions) */
+  hideHeader?: boolean;
 }
 
 export function DashboardShell({
@@ -34,6 +36,7 @@ export function DashboardShell({
   title,
   description,
   actions,
+  hideHeader = false,
 }: DashboardShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -135,7 +138,7 @@ export function DashboardShell({
         </header>
 
         {/* Page Header with Actions */}
-        {(title || actions) && (
+        {!hideHeader && (title || actions) && (
           <div className="border-b border-border bg-background-secondary/50">
             <div className="px-4 lg:px-6 py-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

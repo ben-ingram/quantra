@@ -8,25 +8,25 @@
 **Inventors:** [To be completed by legal counsel]
 **Filing Date:** [To be completed]
 **Application Number:** [To be assigned]
-**Version:** 1.1
+**Version:** 2.0
 
 ---
 
 ## TITLE OF INVENTION
 
-**Hierarchical Hybrid Retrieval-Augmented Generation System with Query Intent Classification for Regulatory Compliance Analysis**
+**Dual-Source Hierarchical Hybrid Retrieval-Augmented Generation System with Query Intent Classification for Construction Compliance Analysis**
 
 ---
 
 ## ABSTRACT
 
-A computer-implemented system and method for automated regulatory compliance analysis comprising: (1) a document ingestion pipeline that extracts text from regulatory documents, segments content into chunks with section identification, generates semantic embeddings, and stores both unstructured text and structured tabular data; (2) a hybrid retrieval engine combining semantic vector search with keyword-based full-text search using weighted scoring with exact-match bonuses; (3) a three-tier evidence hierarchy where structured tabular data supersedes specific regulatory rules, which supersede general regulatory text; (4) a query intent classification system distinguishing between condition statements describing existing states versus requirement questions asking about code specifications; (5) a constrained artificial intelligence analyst with anti-hallucination guardrails operating under explicit data hierarchy rules; and (6) a robust response parser with default value handling for edge cases. The invention addresses technical problems of accurate regulatory code interpretation by combining multiple retrieval strategies, enforcing evidence prioritization, and correctly interpreting user intent.
+A computer-implemented system and method for automated construction compliance analysis comprising: (1) a dual-source document ingestion pipeline that separately processes project specifications (CSI MasterFormat documents with extracted parameters) and building codes (regulatory text), storing each in dedicated database tables; (2) a parallel dual-source retrieval engine that simultaneously queries project specifications filtered by project identifier and building codes filtered by library/jurisdiction; (3) a hybrid search combining semantic vector search with keyword-based full-text search using weighted scoring with exact-match bonuses; (4) a four-tier evidence hierarchy where project design specifications supersede structured tabular data, which supersedes specific regulatory rules, which supersede general regulatory text; (5) a query intent classification system distinguishing between condition statements describing existing states versus requirement questions asking about code specifications; (6) a context assembly system that labels retrieved results as "Design Requirements" versus "Code Requirements" with instructions that design specifications override code when stricter; (7) a constrained artificial intelligence analyst with anti-hallucination guardrails that reports BOTH design and code limits and identifies the governing requirement; and (8) a robust response parser with default value handling for edge cases. The invention addresses technical problems of comparing project-specific design requirements against regulatory code minimums by retrieving from both sources, enforcing evidence prioritization, and correctly identifying which limit governs.
 
 ---
 
 ## FIELD OF THE INVENTION
 
-The present invention relates generally to artificial intelligence systems for document analysis and retrieval-augmented generation, and more particularly to a compliance determination system that combines document ingestion, hybrid search, hierarchical evidence prioritization, query intent classification, and constrained AI analysis for regulatory compliance in construction and building code domains.
+The present invention relates generally to artificial intelligence systems for document analysis and retrieval-augmented generation, and more particularly to a dual-source compliance determination system that retrieves from both project-specific design specifications and regulatory building codes, combining document ingestion, hybrid search, hierarchical evidence prioritization, query intent classification, and constrained AI analysis to determine which requirement governs in construction compliance scenarios.
 
 ---
 
